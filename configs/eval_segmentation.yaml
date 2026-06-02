@@ -1,0 +1,14 @@
+# Segmentation linear probing evaluation configuration
+
+# Model
+model: vit_small
+skipless: true
+
+# Evaluation
+feature_blocks: [11]
+epochs: 30
+lr: 1e-3
+
+# Dataset options: voc, ade20k, coco_stuff
+dataset: voc
+data_dir: ./data/VOCdevkit/VOC2012

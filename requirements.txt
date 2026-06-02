@@ -1,0 +1,25 @@
+# Dependencies for reproducing
+# "Cutting the Skip: Training Residual-Free Transformers" (CENG502).
+#
+# Install with:   pip install -r requirements.txt   (or: python run.py setup)
+#
+# Tested with Python 3.9-3.11. For GPU, install a CUDA-matched PyTorch wheel
+# from https://pytorch.org/get-started/locally/ BEFORE running the command
+# above (or edit the torch line to the correct +cuXXX / --index-url variant).
+
+# --- Core ---
+torch>=2.0.0
+torchvision>=0.15.0
+
+# --- Augmentation / Mixup / RandAugment (supervised training) ---
+timm>=0.9.0
+
+# --- Numerics & IO ---
+numpy>=1.23
+scipy>=1.10          # TokenCut (scipy.ndimage)
+pyyaml>=6.0          # config loading
+tqdm>=4.64           # evaluation progress bars
+pillow>=9.0          # image IO for the dataset loaders
+
+# --- Logging ---
+tensorboard>=2.12    # supervised + DINO training curves

@@ -1,0 +1,74 @@
+# Default configuration for supervised ViT-Base training on ImageNet-1k.
+# Reproduces Table 1 and Figure 1 from
+# "Cutting the Skip: Training Residual-Free Transformers".
+#
+# Usage:
+#   python scripts/train_supervised.py --config configs/supervised_vit_base.yaml
+#
+# Any CLI argument overrides the corresponding YAML key.
+
+# --- Model ---
+model: vit_base
+mode: skip                  # 'skip' | 'skipless' | 'skipless_init'
+num_classes: 200            # Tiny ImageNet (200 classes). Set to 1000 for full ImageNet.
+img_size: 64                # Tiny ImageNet native resolution
+patch_size: 8               # yields 8*8 = 64 patches + 1 CLS = 65 tokens
+
+# --- Dataset ---
+# Defaults to Tiny ImageNet (200 classes, 100k training images, ~250 MB,
+# auto-downloaded by `python run.py`). For the full paper setup, override
+# with --data_dir pointing at ImageNet-1k and set num_classes=1000,
+# img_size=224, patch_size=16.
+data_dir: ./data/tiny-imagenet-200
+num_workers: 8                # hides JPEG decode from the training loop
+
+# --- Training schedule ---
+# Paper uses 300 epochs on full ImageNet-1k. At Tiny-ImageNet (64x64,
+# patch 8) sequences are ~3x shorter, so epochs are much cheaper. We use
+# 60: enough for the residual-free variants to leave the random-init basin
+# while the full 6-config Table 1 sweep still fits on one A100. Override
+# with --epochs to match the paper schedule (see README).
+epochs: 60
+batch_size: 256
+accum_steps: 2               # effective batch = batch_size * accum_steps = 512
+
+# --- Optimizer ---
+optimizer: adamw              # 'adamw' | 'soap'
+lr: 1.0e-3
+weight_decay: 0.3
+betas: [0.9, 0.999]          # overridden to [0.9, 0.95] when optimizer=soap
+max_grad_norm: 1.0
+
+# --- SOAP-specific ---
+soap_precondition_frequency: 10
+
+# --- LR schedule ---
+warmup_epochs: 5
+min_lr: 1.0e-5
+
+# --- Augmentation ---
+randaugment_num_ops: 2
+randaugment_magnitude: 9
+mixup_alpha: 0.8
+cutmix_alpha: 1.0
+mixup_prob: 1.0
+mixup_switch_prob: 0.5
+random_erase_prob: 0.25
+label_smoothing: 0.1
+
+# --- Regularization ---
+drop_rate: 0.0               # embedding / projection dropout
+attn_drop_rate: 0.0
+drop_path_rate: 0.1          # ignored (forced to 0) when mode != 'skip'
+
+# --- Mixed precision ---
+amp: true
+
+# --- Logging & checkpoints ---
+output_dir: ./output/supervised_vit_base
+log_interval: 50             # log training loss every N steps
+save_interval: 10            # save checkpoint every N epochs
+resume: ""                   # path to checkpoint to resume from
+
+# --- Reproducibility ---
+seed: 42

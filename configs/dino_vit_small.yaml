@@ -1,0 +1,59 @@
+# DINO ViT-Small pretraining configuration
+# Paper: "Cutting the Skip: Training Residual-Free Transformers"
+
+# Model
+mode: skipless_init
+depth: 12
+img_size: 64                # Tiny ImageNet native resolution
+patch_size: 8               # 64/8 = 8 patches per side
+global_crop_size: 64
+local_crop_size: 32
+
+# Dataset
+# Defaults to Tiny ImageNet (200 classes, 100k training images, ~250 MB,
+# auto-downloaded by `python run.py`). For the full paper setup, override
+# --data_dir, --img_size 224, --patch_size 16 and bump --epochs to 300.
+data_dir: ./data/tiny-imagenet-200
+num_workers: 8               # DINO multi-crop is IO-heavy; 8 hides JPEG decode
+
+# Training
+# Paper uses 300 epochs on ImageNet-1k. DINO multi-crop runs 10 crops/image
+# (2 global + 8 local), so each step is ~10x a supervised step. 100 epochs
+# is a good "meaningful features" point on one A100; use --epochs 300 to
+# approach the paper schedule (see README).
+epochs: 100
+batch_size: 128
+accum_steps: 1
+
+# Optimizer
+# lr/warmup are the report's WORKING recipe. The paper's original lr=5e-4
+# (warmup 10) diverged on the residual-free backbone at our scale; lr=1.5e-4
+# with a longer warmup trains both backbones the full schedule without NaN/Inf.
+optimizer: adamw
+lr: 1.5e-4
+weight_decay_start: 0.04
+weight_decay_end: 0.4
+warmup_epochs: 20
+min_lr: 1e-6
+
+# DINO
+out_dim: 65536
+teacher_temp: 0.07
+warmup_teacher_temp: 0.04
+warmup_teacher_temp_epochs: 30
+student_temp: 0.1
+momentum_teacher_start: 0.996
+momentum_teacher_end: 1.0
+num_local_crops: 8
+
+# Skipless init hyperparameters (ViT-Small)
+alpha: 1.8
+beta: 1.0
+c: 3.0
+
+# Misc
+output_dir: ./output/dino_vit_small
+log_interval: 50
+save_interval: 20
+seed: 42
+amp: true
