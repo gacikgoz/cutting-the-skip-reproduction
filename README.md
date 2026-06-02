@@ -1,4 +1,4 @@
-# Cutting the Skip — Training Residual-Free Transformers (CENG502 reproduction)
+# Cutting the Skip — Training Residual-Free Transformers
 
 Minimal, self-contained reproduction of
 **"Cutting the Skip: Training Residual-Free Transformers"** (arXiv:2510.00345v1)
