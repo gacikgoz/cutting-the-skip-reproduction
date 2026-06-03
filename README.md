@@ -43,21 +43,31 @@ TokenCut object discovery in Table 3).
 ## Which results are reproduced
 
 Consistent with the plan submitted in the mid-report, this reproduction targets
-the paper's central **within-column ordering** criterion — the *relative*
-ordering of `skip` / `skipless` / `skipless_init`, not absolute magnitudes,
-because we train on a ~39× smaller token-view budget than the paper's
-ImageNet-1k. This is a deliberate dataset substitution that lowers every
-absolute score while leaving the relative ordering — the paper's actual claim —
-intact.
+**all three quantitative tables** of the paper (the full
+`skip` / `skipless` / `skipless_init` comparison structure), at a reduced
+**Tiny-ImageNet** scale rather than ImageNet-1k. The plan's success criterion is
+the paper's central **relative claim**: `skipless_init` should perform clearly
+better than `skipless` and be competitive with the standard residual `skip`
+baseline. Because we train on a ~39× smaller token-view budget, absolute
+magnitudes are not expected to match — the test is the relative ordering.
 
-The following four testable claims are reproduced:
+Outcome against that criterion, reported honestly per the mid-report's
+commitment to flag partial/failed settings:
 
-| Paper claim                          | Reproduced? |
-|--------------------------------------|-------------|
-| Initialization correctness           | ✓ |
-| Table 1 — SOAP supervised ordering   | ✓ (exceeds paper magnitude) |
-| Table 1 — AdamW supervised ordering  | ✓ (gap matches paper ±0.04 pp) |
-| Tables 2–3 — DINO transfer ordering  | ✓ (same direction as the paper) |
+| Paper claim                  | Status |
+|------------------------------|--------|
+| Initialization correctness   | ✓ reproduced |
+| Table 1 — supervised, SOAP   | ✓ reproduced (`skipless_init` > `skipless`, and also > `skip`; exceeds paper magnitude) |
+| Table 1 — supervised, AdamW  | ✓ reproduced (init-vs-no-init gap +12.84 pp ≈ paper +12.8 pp) |
+| Tables 2–3 — DINO transfer   | ⚠️ partial — ordering *direction* holds (`skip ≥ skipless_init`), but `skipless_init` is **not competitive** with `skip` at this scale |
+
+In short: the **supervised claim (Table 1) reproduces fully** under both
+optimizers. The **self-supervised transfer (Tables 2–3) is a partial
+reproduction** — the residual-free backbone keeps the same
+`skip ≥ skipless_init` direction as the paper, but collapses in its deepest
+blocks under the reduced budget, so it does not reach the paper's ~1 pp
+competitiveness with `skip`. The mechanism (loss of the identity shortcut in a
+low-data regime) is detailed in the [Notes](#notes).
 
 ## Results obtained vs. the paper
 
@@ -100,13 +110,15 @@ The headline numbers:
 | `skip`          | 50.49 | 54.3  |
 | `skipless_init` | 23.67 | 51.5  |
 
-For Tables 2–3 the **within-column ordering** (`skip ≥ skipless_init`) matches
-the paper on every row, which is the committed reproduction criterion. The
-*absolute* mIoU/CorLoc are below the paper's by construction: DINO consumes
-token-views, and our Tiny-ImageNet budget is ~39× smaller than ImageNet-1k, so
-even the healthy `skip` baseline keeps only ~30 % of its paper mIoU. The deficit
-hits both backbones and preferentially the residual-free one — see the per-block
-diagnostics summarized in the [Notes](#notes).
+For Tables 2–3 the ordering *direction* (`skip ≥ skipless_init`) matches the
+paper on every row, but this is only a **partial reproduction**: the paper
+reports `skipless_init` within ~1 pp of `skip` (i.e. competitive), whereas at
+our reduced scale `skipless_init` falls far behind. The *absolute* mIoU/CorLoc
+are below the paper's by construction — DINO consumes token-views, and our
+Tiny-ImageNet budget is ~39× smaller than ImageNet-1k, so even the healthy
+`skip` baseline keeps only ~30 % of its paper mIoU — and the residual-free
+backbone is hit hardest because its deepest blocks lose the identity shortcut
+(see the per-block diagnostics in the [Notes](#notes)).
 
 ## Repository structure
 
@@ -241,13 +253,13 @@ python run.py dino --mode skipless_init --epochs 300
   this scale.
 
 - **What "reproduced" means here.** Following the criterion committed to in the
-  mid-report, a result reproduces when the **within-column ordering** of
+  mid-report, a result reproduces when the **relative ordering** of
   `skip` / `skipless` / `skipless_init` matches the paper's, not when the
-  absolute values do. By that criterion all four testable claims reproduce: the
-  initialization is numerically correct, the supervised Table 1 ordering holds
-  under both AdamW and SOAP (and SOAP even exceeds the paper's init-vs-no-init
-  gap), and the DINO transfer results (Tables 2–3) keep `skip ≥ skipless_init`
-  on every row.
+  absolute values do. The supervised Table 1 ordering reproduces fully under
+  both AdamW and SOAP (and SOAP even exceeds the paper's init-vs-no-init gap).
+  The DINO transfer (Tables 2–3) is a **partial** reproduction: it preserves the
+  `skip ≥ skipless_init` direction but not the paper's tight competitiveness, so
+  it is reported honestly as partial rather than full.
 
 - **Expected residual-free behaviour.** The reduced budget hits the
   residual-free `skipless_init` backbone harder than the residual `skip` one,
