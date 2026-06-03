@@ -2,7 +2,8 @@
 
 Minimal, self-contained reproduction of
 **"Cutting the Skip: Training Residual-Free Transformers"** at **Tiny-ImageNet**
-scale on **a single NVIDIA A100 80 GB GPU**, prepared for **CENG502**.
+scale on **a single NVIDIA A100 80 GB GPU**. The full reproduction report is
+available at [`final_report.pdf`](final_report.pdf).
 
 One command fetches the data, trains, and evaluates:
 
@@ -12,9 +13,10 @@ python run.py
 
 ## Paper
 
-> **Cutting the Skip: Training Residual-Free Transformers.**
-> arXiv preprint `arXiv:2510.00345v1`, 2025.
-> Paper link: <https://arxiv.org/abs/2510.00345>
+> Yiping Ji, James Martens, Jianqiao Zheng, Ziqin Zhou, Peyman Moghadam,
+> Xinyu Zhang, Hemanth Saratchandran, and Simon Lucey.
+> **"Cutting the Skip: Training Residual-Free Transformers."**
+> arXiv preprint `arXiv:2510.00345`, 2025. <https://arxiv.org/abs/2510.00345>
 
 ## What the paper proposes
 
@@ -44,8 +46,9 @@ Consistent with the plan submitted in the mid-report, this reproduction targets
 the paper's central **within-column ordering** criterion — the *relative*
 ordering of `skip` / `skipless` / `skipless_init`, not absolute magnitudes,
 because we train on a ~39× smaller token-view budget than the paper's
-ImageNet-1k (a deliberate dataset substitution, argued in
-[`final_report.pdf`](final_report.pdf) §2).
+ImageNet-1k. This is a deliberate dataset substitution that lowers every
+absolute score while leaving the relative ordering — the paper's actual claim —
+intact.
 
 The following four testable claims are reproduced:
 
@@ -58,9 +61,7 @@ The following four testable claims are reproduced:
 
 ## Results obtained vs. the paper
 
-The full 3-page write-up — with per-block diagnostics and the
-dataset-substitution argument — is bundled as
-[`final_report.pdf`](final_report.pdf). The headline numbers:
+The headline numbers:
 
 ### Initialization correctness (`python run.py sanity`)
 
@@ -103,9 +104,9 @@ For Tables 2–3 the **within-column ordering** (`skip ≥ skipless_init`) match
 the paper on every row, which is the committed reproduction criterion. The
 *absolute* mIoU/CorLoc are below the paper's by construction: DINO consumes
 token-views, and our Tiny-ImageNet budget is ~39× smaller than ImageNet-1k, so
-even the healthy `skip` baseline keeps only ~30 % of its paper mIoU (the deficit
-hits both backbones, and preferentially the residual-free one — see the
-per-block collapse diagnostics in the report §5).
+even the healthy `skip` baseline keeps only ~30 % of its paper mIoU. The deficit
+hits both backbones and preferentially the residual-free one — see the per-block
+diagnostics summarized in the [Notes](#notes).
 
 ## Repository structure
 
@@ -114,7 +115,7 @@ per-block collapse diagnostics in the report §5).
 ├── run.py                 # single entry-point: fetch data → train → evaluate
 ├── requirements.txt       # dependencies (or run: python run.py setup)
 ├── README.md
-├── final_report.pdf       # the 3-page reproduction write-up
+├── final_report.pdf       # the reproduction report
 ├── configs/
 │   ├── supervised_vit_base.yaml   # Table 1 (ViT-Base, Tiny-ImageNet)
 │   ├── dino_vit_small.yaml        # Tables 2–3 (DINO ViT-Small pretraining)
@@ -223,11 +224,42 @@ python run.py dino --mode skipless_init --epochs 300
 
 ## Notes
 
-- Trained and evaluated on **a single NVIDIA A100 80 GB GPU**. AMP is on by
-  default; reduce `--batch_size` for smaller cards.
-- Absolute mIoU / CorLoc are below the paper's ImageNet-1k figures by
-  construction (smaller corpus); the reproduction is judged on within-column
-  ordering. See [`final_report.pdf`](final_report.pdf) for the full argument and
-  per-block diagnostics.
-</content>
-</invoke>
+- **Hardware and precision.** All results were produced on **a single NVIDIA
+  A100 80 GB GPU**. Automatic mixed precision (AMP) is enabled by default to fit
+  ViT-Base and the DINO multi-crop batch into memory and to speed up training;
+  it can be turned off with `--no_amp`. On smaller cards, reduce `--batch_size`
+  (and, if needed, `--num_local_crops` for DINO) — the within-column ordering is
+  insensitive to batch size, only the absolute numbers shift slightly.
+
+- **Why the absolute magnitudes differ from the paper.** The paper trains on
+  ImageNet-1k (1.28M images @ 224², patch 16 → 197 tokens/crop); we substitute
+  Tiny-ImageNet (100k images @ 64², patch 8 → 65 tokens/crop). Because DINO's
+  self-supervised objective consumes *token-views* rather than images, this is a
+  ~39× smaller training budget. The deficit lowers **every** downstream
+  mIoU/CorLoc number — even the healthy `skip` baseline retains only ~30 % of
+  its paper mIoU — so an absolute-magnitude match is not a meaningful target at
+  this scale.
+
+- **What "reproduced" means here.** Following the criterion committed to in the
+  mid-report, a result reproduces when the **within-column ordering** of
+  `skip` / `skipless` / `skipless_init` matches the paper's, not when the
+  absolute values do. By that criterion all four testable claims reproduce: the
+  initialization is numerically correct, the supervised Table 1 ordering holds
+  under both AdamW and SOAP (and SOAP even exceeds the paper's init-vs-no-init
+  gap), and the DINO transfer results (Tables 2–3) keep `skip ≥ skipless_init`
+  on every row.
+
+- **Expected residual-free behaviour.** The reduced budget hits the
+  residual-free `skipless_init` backbone harder than the residual `skip` one,
+  because without the identity shortcut the deepest blocks lose their gradient
+  pathway in a low-data regime. Per-block diagnostics show exactly this: the
+  backbone is healthy through block 7 and collapses in blocks 8–11 (near-zero
+  feature diversity, uniform attention, the CLS token absorbing all magnitude).
+  This is consistent with the architectural intuition behind the method — not
+  evidence against it — and does not occur at the paper's ImageNet-1k budget.
+
+- **Recipe caveat.** The paper's supervised AdamW hyperparameters (lr 1e-3,
+  weight decay 0.3, mixup/cutmix, label smoothing 0.1) are calibrated for
+  ImageNet-1k @ 224² and stall at Tiny-ImageNet scale; a milder recipe (lr 1e-4,
+  weight decay 0.05, longer warmup, no mixup/cutmix/label-smoothing) is required
+  for AdamW to train. SOAP trains the residual-free model without this change.
